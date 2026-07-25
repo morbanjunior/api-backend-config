@@ -1,0 +1,14 @@
+{{- if .Values.namespace.create }}
+# The namespace is a versioned resource like any other, so it can carry labels,
+# annotations or quotas that are reviewable in Git.
+#
+# ArgoCD always applies namespaces before the workloads that live in them, so
+# there is no ordering problem: the Secret with the database password can be
+# created as soon as the first sync completes.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .Values.namespace.name }}
+  labels:
+    {{- include "api-backend.labels" (dict "root" $ "component" "namespace") | nindent 4 }}
+{{- end }}

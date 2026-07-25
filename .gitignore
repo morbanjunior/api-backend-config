@@ -1,0 +1,14 @@
+# Never commit rendered secrets or local overrides
+*.secret.yaml
+secret*.yaml
+values.local.yaml
+
+# Helm build artifacts
+charts/*/charts/
+*.tgz
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

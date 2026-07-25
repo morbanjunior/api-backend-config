@@ -1,0 +1,12 @@
+apiVersion: v2
+name: api-backend
+description: Tasks application - FastAPI backend and static frontend
+type: application
+
+# Chart version: how this packaging evolves.
+version: 0.1.0
+
+# App version: informational only. The tags actually deployed live in
+# values.yaml under backend.image.tag / frontend.image.tag, because that is
+# what the CI pipeline rewrites on every release.
+appVersion: "1.0.0"

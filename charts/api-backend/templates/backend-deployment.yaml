@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "api-backend.componentName" (dict "root" $ "component" "backend") }}
+  labels:
+    {{- include "api-backend.labels" (dict "root" $ "component" "backend") | nindent 4 }}
+spec:
+  # replicas is omitted when the HPA is enabled. If it stayed here, Helm and the
+  # HPA would fight over the same field on every sync: Helm resetting it to 1,
+  # the HPA scaling it back up. ArgoCD with selfHeal would make that loop
+  # permanent.
+  {{- if not .Values.backend.autoscaling.enabled }}
+  replicas: {{ .Values.backend.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "api-backend.selectorLabels" (dict "root" $ "component" "backend") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "api-backend.selectorLabels" (dict "root" $ "component" "backend") | nindent 8 }}
+    spec:
+      containers:
+        - name: backend
+          image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag }}"
+          imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8000
+          env:
+            - name: DB_HOST
+              value: {{ .Values.database.host | quote }}
+            - name: DB_PORT
+              value: {{ .Values.database.port | quote }}
+            - name: DB_USER
+              value: {{ .Values.database.user | quote }}
+            - name: DB_NAME
+              value: {{ .Values.database.name | quote }}
+            # Read from a Secret that lives only in the cluster, never in Git.
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.database.passwordSecret.name }}
+                  key: {{ .Values.database.passwordSecret.key }}
+            - name: CORS_ORIGINS
+              value: "*"
+          # Liveness never touches the database: losing Postgres must take the
+          # pod out of the Service, not restart it in a loop.
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          # Readiness does check the database, so a pod that cannot serve real
+          # traffic is removed from the Service endpoints.
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.backend.resources | nindent 12 }}

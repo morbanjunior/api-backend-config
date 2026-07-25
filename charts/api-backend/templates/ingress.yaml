@@ -1,0 +1,40 @@
+{{- if .Values.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "api-backend.fullname" . }}
+  labels:
+    {{- include "api-backend.labels" (dict "root" $ "component" "ingress") | nindent 4 }}
+  {{- with .Values.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  rules:
+    - host: {{ .Values.ingress.host | quote }}
+      http:
+        paths:
+          # /api first: the ingress controller matches the longest prefix, but
+          # keeping the specific rule above the catch-all makes the intent
+          # readable and survives controllers that do respect ordering.
+          #
+          # No rewrite-target annotation is needed. The backend already serves
+          # its routes under /api (/api/tasks, /api/cpu), so the path can be
+          # forwarded untouched. Rewriting here would strip the prefix and
+          # produce 404s.
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "api-backend.componentName" (dict "root" $ "component" "backend") }}
+                port:
+                  number: {{ .Values.backend.service.port }}
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "api-backend.componentName" (dict "root" $ "component" "frontend") }}
+                port:
+                  number: {{ .Values.frontend.service.port }}
+{{- end }}

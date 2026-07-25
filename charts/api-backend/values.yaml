@@ -1,0 +1,74 @@
+namespace:
+  create: true
+  # Must match spec.destination.namespace in argocd/application.yaml.
+  name: tasks
+
+# Without this, resources would be named "<release>-api-backend-backend".
+# Pinning the prefix keeps kubectl output readable: tasks-backend, tasks-frontend.
+fullnameOverride: tasks
+
+# Image tags are rewritten automatically by the CI pipeline of the api-backend
+# repository on every published release. Do not edit them by hand: a manual
+# change here is a change the code repository does not know about.
+backend:
+  image:
+    repository: morbanjunior/tasks-api
+    tag: v1.0.0
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  service:
+    port: 8000
+  # requests.cpu is mandatory for the HPA: without it Kubernetes has no
+  # baseline to compute a CPU percentage against and the HPA reports <unknown>.
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+  autoscaling:
+    enabled: true
+    minReplicas: 1
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 70
+
+frontend:
+  image:
+    repository: morbanjunior/tasks-frontend
+    tag: v1.0.0
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  service:
+    port: 8080
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 64Mi
+
+# PostgreSQL runs as a standalone container on Docker Desktop, outside the
+# cluster, the same way a managed RDS/Cloud SQL instance would. host.minikube.internal
+# is how a pod running under the Docker driver reaches services on the host.
+database:
+  host: host.minikube.internal
+  port: 5432
+  user: appuser
+  name: appdb
+  # The password is NOT here. It comes from a Kubernetes Secret created by hand
+  # (see the README): this repository is public and ArgoCD applies everything in
+  # it to the cluster, so any secret committed here would be a secret published
+  # on GitHub.
+  passwordSecret:
+    name: tasks-db-credentials
+    key: password
+
+ingress:
+  enabled: true
+  className: nginx
+  host: tasks.local
+  # Single host, path-based routing. Both components share an origin, so the
+  # browser never makes a cross-origin request and CORS never comes into play.
+  annotations: {}

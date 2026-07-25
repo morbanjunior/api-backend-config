@@ -1,0 +1,37 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: tasks
+  namespace: argocd
+  # Without this finalizer, deleting the Application leaves its resources
+  # orphaned in the cluster.
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  source:
+    repoURL: https://github.com/morbanjunior/api-backend-config.git
+    targetRevision: main
+    path: charts/api-backend
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: tasks
+
+  syncPolicy:
+    automated:
+      # prune: delete resources removed from Git. Without it, Git stops being
+      # the full description of the cluster and drift accumulates silently.
+      prune: true
+      # selfHeal: revert anything changed directly with kubectl. This is what
+      # makes the repository the single source of truth rather than a suggestion.
+      selfHeal: true
+    # No CreateNamespace=true: the namespace is a template in the chart, so it
+    # is described in Git rather than created as a side effect of syncing.
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m
