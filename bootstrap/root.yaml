@@ -1,0 +1,49 @@
+# App of Apps: the only manifest that ever needs kubectl.
+#
+# This Application does not deploy a workload. Its source is the argocd/
+# directory, which contains other Application manifests -- so ArgoCD ends up
+# managing ArgoCD's own objects.
+#
+# Apply it once per cluster:
+#
+#   kubectl apply -f bootstrap/root.yaml
+#
+# From then on, adding an application means committing a YAML file into
+# argocd/, and removing one means deleting that file. The cluster holds no
+# information that is not in Git: rebuilding it from scratch is this single
+# command plus an ArgoCD install.
+#
+# It deliberately lives OUTSIDE argocd/ so that it does not manage itself.
+# A self-managing root works, but a broken commit could then leave the root
+# unable to repair itself.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: root
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  source:
+    repoURL: https://github.com/morbanjunior/api-backend-config.git
+    targetRevision: main
+    # A directory of plain manifests, not a Helm chart.
+    path: argocd
+    directory:
+      # Only the files directly in argocd/, so a nested folder can be added
+      # later without being picked up by accident.
+      recurse: false
+
+  destination:
+    server: https://kubernetes.default.svc
+    # Application objects only exist where ArgoCD watches for them.
+    namespace: argocd
+
+  syncPolicy:
+    automated:
+      # prune: deleting a file in argocd/ removes that Application, and its own
+      # finalizer then removes everything that Application had deployed.
+      prune: true
+      selfHeal: true
